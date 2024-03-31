@@ -1,0 +1,524 @@
+---
+title: "Exploring Apartment Building Maintenance and Management Trends"
+subtitle: "An Analysis of 2019-2023 RentSafeTO Apartment Building Evaluation Data"
+author: 
+  - itf author
+thanks: "Code and data are available at: https://github.com/Yiming1220/Apartment-Building-Evaluation.git"
+date: today
+date-format: long
+abstract: "This report explores trends in apartment building maintenance and management using data from RentSafeTO, a program aimed at ensuring compliance with building maintenance standards in Toronto. Through exploratory data analysis (EDA), it was found that privately owned and social housing buildings generally exhibit higher building scores compared to Toronto Community Housing Corporation (TCHC) buildings. Furthermore, a positive relationship between graffiti scores and overall building scores was observed for privately owned and TCHC buildings. Additionally, older buildings tend to receive lower scores, indicating a negative correlation between building age and scores. Subsequent linear regression analysis quantified the impact of building age on building scores, revealing a decrease of 0.11 units in score for each additional year of building age. These findings underscore the importance of proactive maintenance efforts in ensuring the quality of apartment buildings and provide valuable insights for policymakers and building managers in enhancing building maintenance standards."
+format: pdf
+toc: TRUE
+number-sections: true
+bibliography: references.bib
+---
+
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+
+#### Load Library ####
+library(tidyverse)
+library(janitor)
+library(ggplot2)
+library(RColorBrewer)
+library(kableExtra)
+library(knitr)
+library(dplyr)
+library(here)
+library(RColorBrewer)
+library(kableExtra)
+library(patchwork)
+library(readr)
+library(palmerpenguins)
+```
+
+# Introduction
+
+Access to adequate housing is a fundamental aspect of human well-being, alongside essentials like food, clothing, and transportation. The quality and comfort of housing significantly impact individuals' overall quality of life. In this report,a public data set on OpenToronto about [*Apartment Building Evaluation*](https://open.toronto.ca/dataset/apartment-building-evaluation/) will be evaluated to quantify the problem.
+
+The Apartment Building Standards program, known as RentSafeTO, plays a crucial role in ensuring that apartment building owners and operators adhere to maintenance standards. This program applies to buildings with three or more storeys and 10 or more units, aiming to safeguard tenants' living conditions. More detailed information about this program named [*RentSafeTO*](https://www.toronto.ca/community-people/housing-shelter/rental-housing-tenant-information/rental-housing-standards/apartment-building-standards/rentsafeto-for-tenants/) can be learned by visiting its website.
+
+
+The primary objective of this paper is to investigate the factors that affect the overall score of apartment buildings, as assessed by RentSafeTO. We examine various variables, including property type, graffiti severity, number of confirmed units, and building age. By analyzing the relationships between these factors and the building scores, we aim to uncover insights into the maintenance and management trends prevalent in Toronto's apartment buildings. Through data visualization techniques and linear regression modeling, we aim to provide a comprehensive understanding of the drivers behind building scores. 
+
+My research seeks to answer the question: what factors influence the evaluation of apartment buildings, and do they have a positive or negative impact? We examine various factors such as property type and building age, among others. In urban environments, the maintenance and management of apartment buildings play a crucial role in ensuring the well-being and safety of residents. The assessment of these buildings not only reflects their physical conditions but also sheds light on broader trends in housing management practices. In this report, we delve into exploring the trends in apartment building maintenance and management using data sourced from RentSafeTO, a program aimed at enforcing building maintenance standards in Toronto. Our analysis focuses on identifying factors that influence building scores, thereby contributing to a better understanding of the determinants of building quality and maintenance practices. By leveraging open questionnaire data, our analysis focuses on understanding residents' concerns regarding living comfort. These insights can inform governmental planning efforts, facilitating the provision of convenient services and facilities to communities. Ultimately, our research aims to contribute to enhancing residents' overall happiness and well-being.
+
+The remainder of this paper is structured as follows. @sec-data will primarily introduce the data used in the research, including its sources, data cleaning procedures, basic statistics, and explanations of key variables. @sec-result will delve into exploratory data analysis using the cleaned dataset, aiming to derive valuable yet intuitive insights. @sec-model will employ linear models to investigate the quantitative relationships affecting the evaluation score. Finally, a discussion will be provided on the strengths and limitations of the report.
+
+In summary, this paper contributes to the existing literature by providing insights into the factors influencing apartment building scores and their implications for housing management. Through our analysis, we aim to facilitate informed decision-making and enhance the quality of apartment living in urban environments.
+
+# Data {#sec-data}
+
+## Data Management
+
+This paper uses the R statistical programming language [@citeR], along with several packages, tidyverse [@citetidyverse], janitor [@citejanitor], here [@citehere], and [@citedplyr]. Figures in this paper were created using the packages ggplot2 [@citeggplot2] and the tables were created using knitr [@citeknitr] and kableExtra[@citekablextra]. Combinations of figures were created using the patchwork package [@citepatchwork].
+
+## Data Source
+
+This dataset contains building evaluation scores for buildings registered with RentSafeTO. Before 2023, buildings must undergo evaluation at least once every three years. During evaluations, Bylaw Enforcement Officers inspect common areas, mechanical and security systems, parking and exterior grounds. Each item is inspected and assigned a score from one to five, with one being the lowest and five being the highest. In 2023, RentsafeTO updated its evaluation process. Buildings must undergo evaluation at least once every two years, increasing the number of evaluation categories to 50 and allocating a weight to the category. The dataset before 2023 and after 2023 are downloaded as two csv files from the website, and the file before 2023 contains 11760 records and 40 cloumns, as for the file after 2023, if contains 1758 records with 71 columns.
+
+The dataset is downloaded from the [Open Toronto website](https://open.toronto.ca/dataset/apartment-building-evaluation/).
+
+## Data Cleaning
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+
+#### Import raw data  ####
+raw_data1 <-
+  read.csv(here::here("data/raw_data/Pre-2023 Apartment Building Evaluations.csv"))
+
+raw_data2 <-
+  read.csv(here::here("data/raw_data/Apartment Building Evaluations 2023 - current.csv"))
+
+#### Clean data and export ####
+cleaned_data1 <- raw_data1 |>
+  select(YEAR_EVALUATED, YEAR_BUILT, PROPERTY_TYPE, CONFIRMED_UNITS, GRAFFITI ,SCORE) |>
+  filter(YEAR_EVALUATED>=2019)
+
+cleaned_data2 <- raw_data2 |>
+  select(YEAR.EVALUATED, YEAR.BUILT, PROPERTY.TYPE, CONFIRMED.UNITS, GRAFFITI ,CURRENT.BUILDING.EVAL.SCORE) |>
+  filter(YEAR.EVALUATED>=2020)
+
+colnames(cleaned_data2) = colnames(cleaned_data1)
+
+cleaned_data <- cleaned_data1 |>
+  rbind(cleaned_data2) |>
+  mutate( AGE = YEAR_EVALUATED-YEAR_BUILT)
+
+cleaned_data <- na.omit(cleaned_data)
+
+#### Save data ####
+write_csv(cleaned_data, "data/analysis_data/cleaned_department_evaluation.csv")
+```
+
+Since the two datasets contains different variable sets and may contain errors, missing values, or inconsistent information, these issues can affect the accuracy and reliability of the analysis. Before formal data analysis and exploration, we need to perform data cleaning, filter out suitable variables from the original data set and merge the two data sets into a single data set for analysis. At the same time, I hope to process a new variable house age from the original data set. This variable needs to subtract the year the house was built from the year the data was collected. This step must also be completed in the data preprocessing step. 
+
+After performing necessary cleaning and missing value processing on the data, we obtained the final sample data set. The data set contains a variety of variables for different years (representing when the sector was assessed), and the distribution is shown in @tbl-1.
+
+```{=tex}
+\begin{align} 
+AGE=YEAR\_ EVALUATED-YEAR \_  BUILT
+\end{align}
+```
+
+```{r}
+#| echo: false
+#| warning: false
+
+#### Create Variable Description Tibble ####
+
+variable_table <-
+  tibble(
+    "Year" = c(
+      "2019",
+      "2020",
+      "2021",
+      "2023"
+    ),
+    "Total # of Records" = c(
+    "1561",
+    "1469",
+    "1461",
+    "1746"
+    ),
+    "Proprotion in Analysis" = c(
+      "25.02%",
+      "23.55%",
+      "23.42%",
+      "27.99%"
+    )
+  )
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-1
+#| tbl-cap: "Distribution of Records in Each Year Evaluated"
+
+
+variable_table |>
+  kable(booktabs = TRUE) |>
+  kable_styling(font_size = 9 ) #, latex_options = "hold_position")
+```
+
+## Key Features
+
+The evaluation score is the estimand of interest, which is the overall score of the building. The score is the sum total of each item that was evaluated. The formula to calculate scores is as follows: sum of all assigned scores during the evaluation / (number of unique items reviewed *5). The other independent variables are house age, property type, confirmed units and graffiti. And description  of these variables are in @tbl-data, which is gained from the official website of this data source. 
+
+```{r}
+#| include: false
+
+#### Create Variable Description Tibble ####
+
+variable_table <-
+  tibble(
+    "Variable" = c(
+      "SCORE",
+      "PROPERTY_TYPE",
+      "GRAFFITI",
+      "YEAR_BUILT" ,
+      "YEAR_EVALUATED" ,
+      "AGE"
+    ),
+    "Variable Description" = c(
+      "This is the overall score of the building.",
+    "This field informs the users of a building.",
+    "This score represents the severity of graffiti in a building.",
+    "This is the year that the building was built in." ,
+    "This represents the year of the building evaluation scores." ,
+    "YEAR_EVALUATED minus YEAR_BUILT."
+    ),
+    "Measurement" = c(
+      "Numeric",
+      "Categorical",
+      "Numeric",
+      "Year",
+      "Year",
+      "Numeric"
+    )
+  )
+
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-data
+#| tbl-cap: "Variable Descriptions"
+#### Add Variable Description Table ####
+variable_table |>
+  kable(booktabs = TRUE) |>
+  kable_styling(font_size = 9)
+```
+
+
+
+
+
+The variable *Property\_Type* refers to the ownership type of the building. In RentSafeTO's dataset, this variable reflects whether the building is privately owned, owned by the Toronto Community Housing Corporation (TCHC), or owned by another assisted, social or supportive housing provider. This variable is crucial to our understanding of how different types of buildings are maintained and managed.TCHC is the housing agency of the City of Toronto and is responsible for managing most of the city's public housing. TCHCs provide low-rent housing for low-income families and individuals, so their maintenance and management may be affected by government regulations and funding constraints. Other Assisted, Social, or Supportive Housing Provider: This category includes assisted, social, or supportive housing provided by other organizations or agencies, such as non-profit organizations, social service agencies or supportive housing agency. These buildings may have special management and service models to meet the needs of specific groups.
+
+We can find in @fig-dis that the distribution of various property types in each evaluation year from the figure below. We can find that Private accounts for the largest proportion, accounting for more than 78% of the samples in each year from @tbl-datadis.
+
+\newpage
+
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: fig-dis
+#| fig-cap: "2019-2023 Comparison of Sample's Property Type Against Year Evaluated"
+#### Creating Graph for comparison property types  against evaluation years ####
+ggplot(data=cleaned_data, aes(x =as.factor(YEAR_EVALUATED), fill = PROPERTY_TYPE)) + 
+  geom_bar(width =.8) +
+  theme_classic() + 
+  labs(
+    x = "Year Evaluated",
+    y = "# of Samples ",
+    fill = "Property Type",
+    caption = "2021 GSS"
+  ) +
+  scale_fill_brewer(palette="Spectral") + 
+  theme(text = element_text(size=6))
+```
+
+```{r}
+#| echo: false
+#| warning: false
+summary_df <- cleaned_data |>
+  group_by(YEAR_EVALUATED, PROPERTY_TYPE) |>
+  summarise(count = n() , .groups="drop") |>
+  ungroup()
+
+summary_df <- summary_df |>
+  group_by(YEAR_EVALUATED) |>
+  mutate(percentage = paste(as.character(round( count / sum(count) * 100 ,2 )) , '%') ) |>
+  ungroup()
+
+pivot_summary <- summary_df |>
+  select(YEAR_EVALUATED, PROPERTY_TYPE, percentage) |>
+  pivot_wider(names_from = PROPERTY_TYPE, values_from = percentage)
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-datadis
+#| tbl-cap: "Percentage of Different Property Types in Each Year Evaluated"
+#### Add Variable Description Table ####
+pivot_summary |>
+  kable(booktabs = TRUE) |>
+  kable_styling(font_size = 12)
+```
+
+# Exploratory Data Analysis and Results {#sec-result}
+
+Exploratory Data Analysis (EDA) plays a pivotal role in unraveling the underlying patterns, relationships, and insights hidden within a dataset. In this section, we embark on a journey of discovery, utilizing a plethora of statistical graphics and visualizations to delve into the intricacies of our data. Through a series of subsections, we aim to unravel the relationships between variables, uncover trends, and identify potential patterns that may inform subsequent analyses. 
+
+## Privately owned and social housing buildings generally exhibit higher building scores compared to TCHC.
+
+In this section of analysis, we utilized boxplots to explore the relationship between building scores and property types across four evaluation years (2019, 2020, 2021, and 2023). A boxplot is a commonly used statistical graph that displays the distribution of data, showing the median, quartiles, and potential outliers. Through the boxplots, we visually compared the distribution of scores across different property types, allowing us to discern any notable differences.
+
+
+```{r}
+#| echo: false
+#| warning: false
+score_type_2019 <- cleaned_data |>
+  filter(YEAR_EVALUATED==2019)|>
+  ggplot(aes(x=PROPERTY_TYPE , y = SCORE, fill = PROPERTY_TYPE)) +geom_boxplot()+ scale_fill_discrete(name="PropertyType") +
+  theme_classic()+labs( x = "Property Type", y = "Score" , title = "Scores for Different Property Types(2019)")+ 
+  theme(legend.position = "none")+
+  theme(text = element_text(size=6))
+  
+score_type_2020 <- cleaned_data |>
+  filter(YEAR_EVALUATED==2020)|>
+  ggplot(aes(x=PROPERTY_TYPE , y = SCORE, fill = PROPERTY_TYPE)) +geom_boxplot()+ scale_fill_discrete(name="PropertyType") +
+  theme_classic()+labs( x = "Property Type", y = "Score" , title = "Scores for Different Property Types(2020)")+ 
+  theme(legend.position = "none")+
+  theme(text = element_text(size=6))
+
+score_type_2021 <- cleaned_data |>
+  filter(YEAR_EVALUATED==2021)|>
+  ggplot(aes(x=PROPERTY_TYPE , y = SCORE, fill = PROPERTY_TYPE)) +geom_boxplot()+ scale_fill_discrete(name="PropertyType") +
+  theme_classic()+labs( x = "Property Type", y = "Score" , title = "Scores for Different Property Types(2021)")+ 
+  theme(legend.position = "none")+
+  theme(text = element_text(size=6))
+
+score_type_2023 <- cleaned_data |>
+  filter(YEAR_EVALUATED==2023)|>
+  ggplot(aes(x=PROPERTY_TYPE , y = SCORE, fill = PROPERTY_TYPE)) +geom_boxplot()+ scale_fill_discrete(name="PropertyType") +
+  theme_classic()+labs( x = "Property Type", y = "Score" , title = "Scores for Different Property Types(2023)")+ 
+  theme(legend.position = "none")+
+  theme(text = element_text(size=6))
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: fig-2
+#| fig-cap: "2019-2022 Comparison of Building's Score Against Property Type"
+#### Using Patchwork Package to Combine four Graphs ####
+(score_type_2019) + (score_type_2020) + (score_type_2021) + (score_type_2023) +
+  plot_annotation(tag_levels = 'A') +
+  plot_layout(ncol = 2)+
+  plot_layout(guides = "collect")
+```
+
+The boxplot @fig-2 analysis yielded a straightforward conclusion: buildings categorized as privately owned and social housing tended to have higher overall scores compared to those owned by the Toronto Community Housing Corporation (TCHC). This observation aligns with our initial expectations but also prompts further investigation and consideration.
+
+The analysis of average building scores across different property types over the four-year period in @tbl-avgscore reveals a notable increase in scores in 2023 compared to previous years (2019-2021). This discrepancy can be attributed to the modification of evaluation rules by RentSafeTO in 2023, which incorporated additional dimensions and attributes for building assessment and introduced a new scoring methodology. As a result, the overall distribution of scores in 2023 differs significantly from previous years. Therefore, by controlling for the year evaluated in our analysis, we mitigate the potential measurement error arising from variations in scoring rules over time.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-avgscore
+#| tbl-cap: "Mean Score for Different Property Types in each Year Evaluated"
+cleaned_data |>
+  group_by(PROPERTY_TYPE, YEAR_EVALUATED) |>
+  summarize(mean_score = mean(SCORE, na.rm = TRUE) , .groups = "drop") |>
+  pivot_wider(names_from = PROPERTY_TYPE, values_from = mean_score) |> 
+  mutate(across(everything(), ~ round(., 2))) |>
+  kable(booktabs = TRUE) |>
+  kable_styling(font_size = 12 )
+```
+
+
+The underlying reasons for this discrepancy could be multifaceted. Firstly, TCHC provides low-rent housing for low-income families and individuals, resulting in relatively lower rental costs. This may lead to limited investments in maintenance and management for TCHC buildings, consequently impacting their overall scores. Additionally, privately owned and social housing buildings may benefit from more proactive maintenance and management efforts by private owners or social organizations to maintain property values and living environments[@ferrell2018livable].
+
+However, it's important to note that this conclusion is based on observed data patterns and does not imply that privately owned and social housing buildings are inherently of higher quality than those owned by TCHC. Further analysis is required to explore other potential influencing factors such as building age, geographical location, etc., and to provide a more nuanced interpretation of the data. Such analysis will contribute to a more comprehensive understanding of the causal relationships underlying building scores, informing future decision-making and policy formulation.
+
+
+## For privately owned and TCHC buildings, there is a positive relationship between graffiti scores and overall building scores.
+
+In the subsequent analysis using pivot tables, I examined the relationship between building scores and graffiti scores across different property types and evaluation years. From @tbl-graffiti, it is evident that for privately owned houses and those owned by the Toronto Community Housing Corporation (TCHC), higher graffiti scores corresponded to higher overall scores during evaluations in 2019-2021. Conversely, for social housing, this relationship was only prominent in the evaluation of 2020, while being less apparent in other years.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-graffiti
+#| tbl-cap: "Mean Score for Different Property Types against Graffiti Score in each Year Evaluated"
+cleaned_data |>
+  mutate( GRAFFITI= as.integer(GRAFFITI)) |>
+  group_by(PROPERTY_TYPE, YEAR_EVALUATED , GRAFFITI) |>
+  summarize(mean_score = mean(SCORE, na.rm = TRUE) , .groups = "drop") |>
+  pivot_wider(names_from = GRAFFITI, values_from = mean_score) |> 
+  mutate(across(-c( PROPERTY_TYPE , YEAR_EVALUATED), ~ round(., 2))) |>
+  kable(booktabs = TRUE) |>
+  kable_styling(font_size = 12 )
+```
+
+These findings suggest that the impact of graffiti scores on building scores varies across different property types and evaluation years. For privately owned and TCHC buildings, the positive correlation between graffiti scores and overall scores could be indicative of proactive maintenance efforts to address graffiti and maintain overall building quality. However, the less consistent relationship observed for social housing may reflect different management approaches or varying levels of emphasis on graffiti removal and building maintenance across different evaluation periods.
+
+Possible reasons behind these variations could include differences in property management strategies, resource allocation for maintenance and cleaning, or community engagement initiatives aimed at addressing graffiti issues. Additionally, external factors such as changes in neighborhood dynamics or vandalism trends may also influence the observed relationships between graffiti scores and building scores. Overall, these findings underscore the complex interplay between building maintenance practices, property management approaches, and external factors in shaping building evaluation outcomes across different property types and evaluation years.
+
+## Older buildings tend to receive lower scores.
+
+Through scatter plot analysis, it is evident from Figure @fig-age that for privately owned houses, there exists a significant negative correlation between building scores and age, indicating that older buildings tend to receive lower scores. This observation aligns with our intuition that newer properties are often preferred for residence. However, anomalies are observed for buildings with ages exceeding 150 years, as their scores deviate from this trend and appear higher. This anomaly may be attributed to the historical significance of these older buildings, coupled with diligent maintenance efforts by owners, resulting in elevated scores.
+
+
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: fig-age
+#| fig-cap: "Mean Score Grouped by Age for Different Property Types"
+cleaned_data |>
+  group_by(PROPERTY_TYPE, AGE) |>
+  summarize(mean_score = mean(SCORE, na.rm = TRUE) , .groups = "drop") |>
+  ggplot(aes(x=AGE , y=mean_score)) + geom_point() +facet_wrap(~PROPERTY_TYPE)
+```
+Conversely, for social housing, no clear trend between building scores and age is discernible. However, for buildings owned by the Toronto Community Housing Corporation (TCHC), a noticeable negative correlation exists, and it is apparent from @fig-age that TCHC buildings generally have newer ages.
+
+These findings underscore the complex relationship between building age and scores, with various factors potentially influencing the observed patterns. For privately owned houses, the negative correlation may be attributed to preferences for newer properties and the impact of diligent maintenance practices. However, anomalies observed for exceptionally old buildings suggest the influence of historical significance and exceptional maintenance efforts. Conversely, the absence of a clear trend for social housing buildings may be indicative of varied management approaches and maintenance standards. Overall, these insights highlight the nuanced interplay between building age, maintenance practices, and historical significance in shaping building evaluation outcomes.
+
+
+# Model {#sec-model}
+
+In light of the negative correlation observed between building age and scores during the Exploratory Data Analysis (EDA) phase, we further delve into the relationship through linear regression analysis. In this Model section, our aim is to construct a  linear regression model to quantify the impact of building age on building scores. By delineating the model's formulation, justifications, and rationale, we seek to provide a comprehensive understanding of the underlying relationship between these variables. 
+
+## Model set-up
+
+Define the model formula as:
+
+```{=tex}
+\begin{align} 
+SCORE = \beta_0 +\beta_1 AGE +\epsilon.
+\end{align}
+```
+
+## Model Result
+
+We run the model in R [@citeR] using the `lm()` command. And the model result is show in @fig-lm and @tbl-lmsumm.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: code-lm
+date_score_year <- cleaned_data |>
+  filter(AGE<=150) |>
+  group_by( AGE) |>
+  summarize(mean_score = mean(SCORE, na.rm = TRUE) , .groups = "drop") 
+
+model <- lm(mean_score ~ AGE, data = date_score_year)
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: fig-lm
+#| fig-cap: "Mean Score Grouped by Age for Different Property Types"
+
+date_score_year <- cleaned_data |>
+  filter(AGE<=150) |>
+  group_by( AGE) |>
+  summarize(mean_score = mean(SCORE, na.rm = TRUE) , .groups = "drop") 
+
+model <- lm(mean_score ~ AGE, data = date_score_year)
+
+
+# Create scatter plot for model
+ggplot(date_score_year, aes(x = AGE, y = mean_score)) +
+  geom_point() +  
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "AGE", y = "SCORE") 
+```
+
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-lmsumm
+#| tbl-cap: "Mean Score for Different Property Types against Graffiti Score in each Year Evaluated"
+library(broom)
+
+model_summary <- tidy(summary(model))
+model_summary |>
+  kable( caption = "Model Summary", align = "c" , digits = 2)
+```
+
+The conclusion drawn from the linear regression model is that there exists a statistically significant linear relationship between the independent variable (age) and the dependent variable (score). The fitted regression line accurately captures the trend observed in the scatter plot, suggesting that age is a significant predictor of building scores.
+
+The formula
+$$SCORE=87.68−0.11 \times AGE $$
+epresents the linear regression equation obtained from the model. 87.68 represents the intercept of the regression line, indicating the estimated score when the age of the building is zero. −0.11 is the coefficient of the age variable, representing the rate of change in the predicted score for each unit increase in the age of the building.
+
+
+## Model justification
+
+During the validation and justification process of the linear regression model, we used the `plot()` function to examine the model's fit. By observing the residual plots, we found that the residuals exhibit a random distribution pattern as the predicted values increase, without any apparent systematic patterns. This suggests that the model may adhere to the assumptions of linear regression. Additionally, no clear heteroscedasticity was observed in the scatter plot of residuals against predicted values. Taken together, these results indicate that our linear regression model has passed validation and can reasonably account for the variability in the target variable.
+
+```{r}
+#| echo: false
+#| eval: true
+plot(model)
+```
+
+# Discussion {#sec-discussion}
+
+## Main Findings
+
+We summarize the key findings obtained through exploratory data analysis (EDA) and linear regression analysis:
+
+1. Exploratory Data Analysis (EDA) Findings:
+- Privately owned and social housing buildings generally exhibit higher building scores compared to TCHC.
+- For privately owned and TCHC buildings, there is a positive relationship between graffiti scores and overall building scores.
+- Older buildings tend to receive lower scores.
+
+2. Linear Regression Analysis:
+- Through linear regression analysis, we quantified the impact of building age (Age) on building scores. The regression equation obtained is:
+$$SCORE=87.68−0.11 \times AGE .$$
+- This equation indicates that for each additional year of building age, the building score is expected to decrease by 0.11 units.
+
+## Limitations and Weaknesses 
+
+1. Regional Limitation: The analysis is confined to apartment buildings in Toronto due to the dataset's source being RentSafeTO. Consequently, the findings may not be generalizable to apartment buildings in other cities or regions.
+
+2. Limited Variables: The dataset may lack certain variables that could provide deeper insights into building maintenance and management. For instance, factors such as tenant demographics, building materials, or maintenance budgets could influence building scores but are not included in the analysis.
+
+3. Model Assumptions: While linear regression was employed to quantify the relationship between building age and scores, it assumes a linear relationship between the variables and may not capture potential non-linear associations. Alternative modeling approaches, such as polynomial regression or non-linear models, could be explored to better capture the complexity of the relationship.
+
+4. External Factors: The analysis may not account for external factors that could influence building scores, such as economic conditions, neighborhood characteristics, or building management practices. Failure to consider these factors could limit the comprehensiveness of the analysis and the interpretation of results.
+
+Addressing these limitations and weaknesses could enhance the robustness and applicability of the findings, providing a more comprehensive understanding of apartment building maintenance and management trends.
+
+## Future Research
+
+1. Multi-City Comparison: Future research could extend the analysis beyond Toronto to include apartment buildings in other cities or regions. Comparing building maintenance and management practices across different geographical areas could provide valuable insights into regional variations and best practices.
+
+2. Inclusion of Additional Variables: Expanding the dataset to include a wider range of variables, such as tenant demographics, building materials, maintenance budgets, and neighborhood characteristics, could enrich the analysis. Exploring the impact of these factors on building scores could offer a more comprehensive understanding of building maintenance dynamics.
+
+3. Exploration of Non-linear Relationships: Investigating non-linear relationships between building age, graffiti scores, and building scores could provide a more nuanced understanding of their interplay. Future research could explore the use of advanced modeling techniques, such as nonlinear regression or machine learning algorithms, to capture complex relationships more accurately.
+
+4. Policy Evaluation: Assessing the impact of RentSafeTO and other building maintenance standards programs on building scores and overall building quality could be an important area for future research. Evaluating the effectiveness of policy interventions and identifying areas for improvement could inform policy development and implementation strategies[@foster2022evaluation].
+
+\newpage
+
+\appendix
+
+# Appendix {.unnumbered}
+
+# Linear Regression Model
+
+Linear regression is a statistical method used to model the relationship between a dependent variable and one or more independent variables. The relationship is assumed to be linear, meaning that changes in the independent variables are associated with linear changes in the dependent variable. The general form of a linear regression model with one independent variable can be expressed as[@su2012linear]:
+$$
+y=\beta_0 +\beta_1 x+\epsilon.
+$$
+Where 
+- $y$  is the dependent variable (the variable we want to predict).
+- $x$  is the independent variable (the variable that influences $y$).
+- $\beta_0$ is the intercept, which represents the value of $y$ when $x=0$.
+- $\beta_1$ is the slope, which represents the change in $y$ fro one-unit change in $x$.
+- $\epsilon$ is the error term.
+
+The goal of linear regression is to estimate the coefficients that best fit the data, typically by minimizing the sum of the squared differences between the observed and predicted values of $y$. Once the coefficients are estimated, the model can be used to make predictions about the dependent variable based on new values of the independent variables.
+
+
+\newpage
+
+# References
