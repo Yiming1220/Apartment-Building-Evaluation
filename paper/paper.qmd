@@ -2,7 +2,7 @@
 title: "Exploring Apartment Building Maintenance and Management Trends"
 subtitle: "An Analysis of 2019-2023 RentSafeTO Apartment Building Evaluation Data"
 author: 
-  - itf author
+  - Yiming Tang
 thanks: "Code and data are available at: https://github.com/Yiming1220/Apartment-Building-Evaluation.git"
 date: today
 date-format: long
